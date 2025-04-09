@@ -11,6 +11,6 @@ export class NotificationGateway {
   server: Server;
 
   sendNotification(data: any) {
-    this.server.emit('UpdatedMarket ', data);
+    this.server.emit('UpdatedMarket', data);
   }
 }

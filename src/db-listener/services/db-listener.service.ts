@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Client, ClientConfig } from 'pg';
 import { NotificationGateway } from '../../notificacion';
 import { ConfigService } from '@nestjs/config';
+import { MarketUpdateNotification } from 'src/market/interfaces';
 
 @Injectable()
 export class DbListenerService implements OnModuleInit {
@@ -24,17 +25,16 @@ export class DbListenerService implements OnModuleInit {
     this.client = new Client(clientConfig);
 
     await this.client.connect();
-    await this.client.query('LISTEN market_update');
+    await this.client.query('LISTEN table_changes');
 
-    console.log('🟢 Escuchando market_update');
+    console.log('🟢 Escuchando table_changes');
 
     this.client.on('notification', (msg) => {
-      const data = JSON.parse(String(msg.payload));
+      const data: MarketUpdateNotification = JSON.parse(String(msg.payload));
       console.log('📦 Evento recibido:', data);
 
       this.notificationGateway.sendNotification({
-        mensaje: `Market "${data.name}" actualizado`,
-        hora: data.update_date,
+        data,
       });
     });
   }
