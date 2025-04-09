@@ -1,8 +1,9 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Client, ClientConfig } from 'pg';
 import { NotificationGateway } from '../../notificacion';
 import { ConfigService } from '@nestjs/config';
 import { MarketUpdateNotification } from 'src/market/interfaces';
+import { MarketService } from 'src/market';
 
 @Injectable()
 export class DbListenerService implements OnModuleInit {
@@ -11,30 +12,45 @@ export class DbListenerService implements OnModuleInit {
   constructor(
     private readonly notificationGateway: NotificationGateway,
     private readonly configService: ConfigService,
+    private readonly marketService: MarketService,
   ) {}
 
-  async onModuleInit() {
-    const clientConfig: ClientConfig = {
+  private getConnection(): ClientConfig {
+    return {
       host: this.configService.get<string>('DB_HOST'),
       port: this.configService.get<number>('DB_PORT'),
       user: this.configService.get<string>('DB_USERNAME'),
       password: this.configService.get<string>('DB_PASSWORD'),
       database: this.configService.get<string>('DB_NAME'),
     };
+  }
 
-    this.client = new Client(clientConfig);
+  async onModuleInit() {
+    this.client = new Client(this.getConnection());
 
     await this.client.connect();
     await this.client.query('LISTEN table_changes');
-
-    console.log('🟢 Escuchando table_changes');
+    console.log('\n');
+    Logger.log('LISTENING TO TABLE CHANGES', 'DB LISTENER');
 
     this.client.on('notification', (msg) => {
-      const data: MarketUpdateNotification = JSON.parse(String(msg.payload));
-      console.log('📦 Evento recibido:', data);
-
-      this.notificationGateway.sendNotification({
-        data,
+      (async () => {
+        const data: MarketUpdateNotification = JSON.parse(String(msg.payload));
+        const { id, processName, schema, table } = data;
+        const market = await this.marketService.findMarketById(id);
+        console.log('\n');
+        Logger.log(id, 'ID');
+        Logger.log(processName, 'PROCESS NAME');
+        Logger.log(schema, 'SCHEMA');
+        Logger.log(table, 'TABLE');
+        this.notificationGateway.sendNotification({
+          market,
+          processName,
+          schema,
+          table,
+        });
+      })().catch((error) => {
+        console.error('Error handling notification:', error);
       });
     });
   }

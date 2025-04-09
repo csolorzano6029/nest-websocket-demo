@@ -28,4 +28,17 @@ export class MarketService {
   findAll() {
     return this.marketRepository.find();
   }
+
+  async findMarketById(id: string): Promise<MarketEntity> {
+    const market = await this.marketRepository
+      .createQueryBuilder('market')
+      .where('market.id = :id', { id })
+      .getOne();
+
+    if (!market) {
+      throw new Error(`Market with id ${id} not found`);
+    }
+
+    return market;
+  }
 }
